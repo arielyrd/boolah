@@ -1,179 +1,138 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { CheckCircle, XCircle, MoreHorizontal, Eye, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { AdminHeader } from "@/components/admin/admin-header";
-
-// Mock data for bookings
-const mockBookings = [
-  {
-    id: 1,
-    fieldId: 1,
-    fieldName: "Downtown Soccer Field",
-    userId: 101,
-    userName: "John Smith",
-    userEmail: "john@example.com",
-    date: new Date(2025, 4, 15), // May 15, 2025
-    timeSlot: "09:00 AM - 10:00 AM",
-    price: 60,
-    status: "pending",
-    createdAt: new Date(2025, 4, 10), // May 10, 2025
-  },
-  {
-    id: 2,
-    fieldId: 3,
-    fieldName: "Sunshine Tennis Center",
-    userId: 102,
-    userName: "Emily Johnson",
-    userEmail: "emily@example.com",
-    date: new Date(2025, 4, 16), // May 16, 2025
-    timeSlot: "02:00 PM - 03:00 PM",
-    price: 35,
-    status: "confirmed",
-    createdAt: new Date(2025, 4, 9), // May 9, 2025
-  },
-  {
-    id: 3,
-    fieldId: 2,
-    fieldName: "Elite Basketball Court",
-    userId: 103,
-    userName: "Michael Brown",
-    userEmail: "michael@example.com",
-    date: new Date(2025, 4, 14), // May 14, 2025
-    timeSlot: "06:00 PM - 07:00 PM",
-    price: 45,
-    status: "confirmed",
-    createdAt: new Date(2025, 4, 8), // May 8, 2025
-  },
-  {
-    id: 4,
-    fieldId: 1,
-    fieldName: "Downtown Soccer Field",
-    userId: 104,
-    userName: "Sofia Garcia",
-    userEmail: "sofia@example.com",
-    date: new Date(2025, 4, 17), // May 17, 2025
-    timeSlot: "11:00 AM - 12:00 PM",
-    price: 60,
-    status: "pending",
-    createdAt: new Date(2025, 4, 11), // May 11, 2025
-  },
-  {
-    id: 5,
-    fieldId: 4,
-    fieldName: "Green Valley Baseball Field",
-    userId: 105,
-    userName: "David Wilson",
-    userEmail: "david@example.com",
-    date: new Date(2025, 4, 18), // May 18, 2025
-    timeSlot: "04:00 PM - 05:00 PM",
-    price: 70,
-    status: "cancelled",
-    createdAt: new Date(2025, 4, 7), // May 7, 2025
-  },
-];
+import { supabase } from "@/lib/supabase";
 
 export default function AdminBookingsPage() {
-  const [bookings, setBookings] = useState(mockBookings);
-  const [selectedBooking, setSelectedBooking] = useState<typeof mockBookings[0] | null>(null);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  // Proteksi admin client-side
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+      const { data, error } = await supabase.from("users").select("role").eq("id", user.id).single();
+      if (error || !data || data.role !== "admin") {
+        router.replace("/dashboard");
+        return;
+      }
+      setLoading(false);
+    };
+    checkAdmin();
+  }, [router]);
+
+  // State booking
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
-  
-  const handleViewDetails = (booking: typeof mockBookings[0]) => {
+
+  // Fetch bookings from Supabase
+  useEffect(() => {
+    const fetchBookings = async () => {
+      const { data } = await supabase
+        .from("bookings")
+        .select(
+          `
+          id,
+          field_id,
+          user_id,
+          date,
+          start_time,
+          status,
+          total_price,
+          created_at
+        `
+        )
+        .order("date", { ascending: false });
+      if (data) setBookings(data);
+    };
+    if (!loading) fetchBookings();
+  }, [loading]);
+
+  const handleViewDetails = (booking: any) => {
     setSelectedBooking(booking);
     setIsDetailsOpen(true);
   };
-  
-  const handleConfirmBooking = (booking: typeof mockBookings[0]) => {
+
+  const handleConfirmBooking = (booking: any) => {
     setSelectedBooking(booking);
     setIsConfirmDialogOpen(true);
   };
-  
-  const handleCancelBooking = (booking: typeof mockBookings[0]) => {
+
+  const handleCancelBooking = (booking: any) => {
     setSelectedBooking(booking);
     setIsCancelDialogOpen(true);
   };
-  
-  const confirmBookingAction = () => {
+
+  const confirmBookingAction = async () => {
     if (selectedBooking) {
-      // In real app, this would call the Laravel API to confirm the booking
-      setBookings(bookings.map(booking => 
-        booking.id === selectedBooking.id 
-          ? { ...booking, status: "confirmed" } 
-          : booking
-      ));
+      await supabase.from("bookings").update({ status: "confirmed" }).eq("id", selectedBooking.id);
+      setBookings(bookings.map((booking) => (booking.id === selectedBooking.id ? { ...booking, status: "confirmed" } : booking)));
       setIsConfirmDialogOpen(false);
     }
   };
-  
-  const cancelBookingAction = () => {
+
+  const cancelBookingAction = async () => {
     if (selectedBooking) {
-      // In real app, this would call the Laravel API to cancel the booking
-      setBookings(bookings.map(booking => 
-        booking.id === selectedBooking.id 
-          ? { ...booking, status: "cancelled" } 
-          : booking
-      ));
+      await supabase.from("bookings").update({ status: "cancelled" }).eq("id", selectedBooking.id);
+      setBookings(bookings.map((booking) => (booking.id === selectedBooking.id ? { ...booking, status: "cancelled" } : booking)));
       setIsCancelDialogOpen(false);
     }
   };
-  
+
   const getStatusBadge = (status: string) => {
-    switch(status) {
+    switch (status) {
       case "confirmed":
         return <Badge className="bg-green-500">Confirmed</Badge>;
       case "pending":
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-600">Pending</Badge>;
+        return (
+          <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+            Pending
+          </Badge>
+        );
       case "cancelled":
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-  
+
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+
   return (
     <div className="flex flex-col min-h-screen">
       <AdminHeader />
       <div className="flex-1 container py-8">
         <h1 className="text-2xl font-bold mb-6">Manage Bookings</h1>
-        
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>Field</TableHead>
-                <TableHead>User</TableHead>
+                <TableHead>Field ID</TableHead>
+                <TableHead>User ID</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
+                <TableHead>Start Time</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Total Price</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -181,12 +140,12 @@ export default function AdminBookingsPage() {
               {bookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>#{booking.id}</TableCell>
-                  <TableCell className="font-medium">{booking.fieldName}</TableCell>
-                  <TableCell>{booking.userName}</TableCell>
-                  <TableCell>{format(booking.date, "MMM dd, yyyy")}</TableCell>
-                  <TableCell>{booking.timeSlot}</TableCell>
+                  <TableCell>{booking.field_id}</TableCell>
+                  <TableCell>{booking.user_id}</TableCell>
+                  <TableCell>{format(new Date(booking.date), "MMM dd, yyyy")}</TableCell>
+                  <TableCell>{booking.start_time}</TableCell>
                   <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                  <TableCell className="text-right">${booking.price}</TableCell>
+                  <TableCell className="text-right">${booking.total_price}</TableCell>
                   <TableCell className="text-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -220,7 +179,7 @@ export default function AdminBookingsPage() {
             </TableBody>
           </Table>
         </div>
-        
+
         {/* Booking Details Dialog */}
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
           <DialogContent className="sm:max-w-md">
@@ -239,40 +198,39 @@ export default function AdminBookingsPage() {
                     <div>{getStatusBadge(selectedBooking.status)}</div>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Field</h4>
-                  <p className="font-medium">{selectedBooking.fieldName}</p>
+                  <h4 className="text-sm font-medium text-muted-foreground">Field ID</h4>
+                  <p className="font-medium">{selectedBooking.field_id}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground">Date</h4>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {format(selectedBooking.date, "MMMM dd, yyyy")}
+                      {format(new Date(selectedBooking.date), "MMMM dd, yyyy")}
                     </div>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Time</h4>
-                    <p>{selectedBooking.timeSlot}</p>
+                    <h4 className="text-sm font-medium text-muted-foreground">Start Time</h4>
+                    <p>{selectedBooking.start_time}</p>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">User</h4>
-                  <p>{selectedBooking.userName}</p>
-                  <p className="text-sm text-muted-foreground">{selectedBooking.userEmail}</p>
+                  <h4 className="text-sm font-medium text-muted-foreground">User ID</h4>
+                  <p>{selectedBooking.user_id}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Price</h4>
-                    <p className="font-medium">${selectedBooking.price}</p>
+                    <h4 className="text-sm font-medium text-muted-foreground">Total Price</h4>
+                    <p className="font-medium">${selectedBooking.total_price}</p>
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground">Booked On</h4>
-                    <p>{format(selectedBooking.createdAt, "MMM dd, yyyy")}</p>
+                    <p>{selectedBooking.created_at ? format(new Date(selectedBooking.created_at), "MMM dd, yyyy") : "-"}</p>
                   </div>
                 </div>
               </div>
@@ -308,48 +266,38 @@ export default function AdminBookingsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        
+
         {/* Confirm Booking Dialog */}
         <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Confirm Booking</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to confirm this booking?
-              </DialogDescription>
+              <DialogDescription>Are you sure you want to confirm this booking?</DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button 
-                className="bg-green-500 hover:bg-green-600"
-                onClick={confirmBookingAction}
-              >
+              <Button className="bg-green-500 hover:bg-green-600" onClick={confirmBookingAction}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Confirm Booking
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        
+
         {/* Cancel Booking Dialog */}
         <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Cancel Booking</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to cancel this booking? This action cannot be undone.
-              </DialogDescription>
+              <DialogDescription>Are you sure you want to cancel this booking? This action cannot be undone.</DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
                 Go Back
               </Button>
-              <Button 
-                variant="destructive" 
-                onClick={cancelBookingAction}
-              >
+              <Button variant="destructive" onClick={cancelBookingAction}>
                 <XCircle className="h-4 w-4 mr-2" />
                 Cancel Booking
               </Button>
