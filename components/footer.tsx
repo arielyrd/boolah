@@ -6,11 +6,9 @@ export default function Footer() {
       <div className="container flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-1">
           <Link href="/" className="text-lg font-bold">
-            SportsBook
+            BOOLAH
           </Link>
-          <p className="text-sm text-muted-foreground">
-            Book your favorite sports fields easily
-          </p>
+          <p className="text-sm text-muted-foreground">Book your Sports Field Easily and Efficient.</p>
         </div>
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 text-sm">
           <Link href="/terms" className="hover:underline underline-offset-4">
@@ -23,9 +21,7 @@ export default function Footer() {
             Contact Us
           </Link>
         </div>
-        <div className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} SportsBook. All rights reserved.
-        </div>
+        <div className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} BOOLAH. All rights reserved.</div>
       </div>
     </footer>
   );

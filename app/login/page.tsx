@@ -61,7 +61,7 @@ export default function LoginPage() {
 
       toast({
         title: "Login successful",
-        description: "Welcome back to SportsBook!",
+        description: "Welcome back to BOOLAH!",
       });
 
       router.push(redirectUrl);

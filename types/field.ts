@@ -1,10 +1,10 @@
 export interface FieldData {
-  id: number;
+  id: string; // UUID
   name: string;
-  sportType: string;
+  sport_type: string;
   location: string;
   description: string;
-  pricePerHour: number;
-  imageUrl: string;
-  amenities: string[];
+  price_per_hour: number;
+  image_url: string;
+  amenities?: string[]; // opsional, jika ada relasi/kolom amenities
 }

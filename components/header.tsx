@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, User, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -11,6 +12,8 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const isAdminPage = pathname.startsWith("/admin");
 
   useEffect(() => {
     const getSession = async () => {
@@ -34,7 +37,7 @@ export default function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold text-primary">SportsBook</span>
+            <span className="text-xl font-bold text-primary">BOOLAH</span>
           </Link>
         </div>
 
@@ -51,41 +54,53 @@ export default function Header() {
           </Link>
         </nav>
 
-        <div className="hidden md:flex items-center gap-4">
-          <ThemeToggle />
-          {!loading && !user && (
-            <>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/login">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Login
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href="/register">
-                  <User className="h-4 w-4 mr-2" />
-                  Register
-                </Link>
-              </Button>
-            </>
-          )}
-          {!loading && user && (
-            <>
-              <span className="text-sm mr-2">Hi, {user.email}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  setUser(null);
-                }}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </>
-          )}
-        </div>
+        {/* Tombol kanan atas */}
+        {!isAdminPage && (
+          <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
+            {!loading && !user && (
+              <>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/login">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Login
+                  </Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/register">
+                    <User className="h-4 w-4 mr-2" />
+                    Register
+                  </Link>
+                </Button>
+              </>
+            )}
+            {!loading && user && (
+              <>
+                <span className="text-sm mr-2">Hi, {user.email}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setUser(null);
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+        {/* Tombol Exit Admin untuk desktop */}
+        {isAdminPage && (
+          <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/">Exit Admin</Link>
+            </Button>
+          </div>
+        )}
 
         {/* Mobile navigation */}
         <div className="md:hidden flex items-center gap-4">
@@ -109,42 +124,50 @@ export default function Header() {
             <Link href="/contact" className="px-2 py-2 text-sm font-medium hover:bg-accent rounded-md" onClick={() => setIsMenuOpen(false)}>
               Contact
             </Link>
-            <div className="flex flex-col gap-2 pt-2 border-t">
-              {!loading && !user && (
-                <>
-                  <Button variant="outline" size="sm" asChild className="justify-start">
-                    <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Login
-                    </Link>
-                  </Button>
-                  <Button size="sm" asChild className="justify-start">
-                    <Link href="/register" onClick={() => setIsMenuOpen(false)}>
-                      <User className="h-4 w-4 mr-2" />
-                      Register
-                    </Link>
-                  </Button>
-                </>
-              )}
-              {!loading && user && (
-                <>
-                  <span className="text-sm px-2 py-1">Hi, {user.email}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="justify-start"
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      setUser(null);
-                      setIsMenuOpen(false);
-                    }}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </>
-              )}
-            </div>
+            {!isAdminPage && (
+              <div className="flex flex-col gap-2 pt-2 border-t">
+                {!loading && !user && (
+                  <>
+                    <Button variant="outline" size="sm" asChild className="justify-start">
+                      <Link href="/login" onClick={() => setIsMenuOpen(false)}>
+                        <LogIn className="h-4 w-4 mr-2" />
+                        Login
+                      </Link>
+                    </Button>
+                    <Button size="sm" asChild className="justify-start">
+                      <Link href="/register" onClick={() => setIsMenuOpen(false)}>
+                        <User className="h-4 w-4 mr-2" />
+                        Register
+                      </Link>
+                    </Button>
+                  </>
+                )}
+                {!loading && user && (
+                  <>
+                    <span className="text-sm px-2 py-1">Hi, {user.email}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start"
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        setUser(null);
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Tombol Exit Admin untuk mobile */}
+            {isAdminPage && (
+              <Button variant="outline" size="sm" className="justify-start mt-2" asChild onClick={() => setIsMenuOpen(false)}>
+                <Link href="/">Exit Admin</Link>
+              </Button>
+            )}
           </div>
         </div>
       )}

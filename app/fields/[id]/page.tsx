@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -13,109 +13,123 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { FieldData } from "@/types/field";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
-// Mock data - would be fetched from your Laravel API
-const mockFields: FieldData[] = [
-  {
-    id: 1,
-    name: "Downtown Soccer Field",
-    sportType: "football",
-    location: "123 Main St, Downtown",
-    description: "Professional soccer field with high-quality turf and floodlights for evening games. Perfect for team practice or friendly matches. The field includes marked lines, goal posts, and corner flags.",
-    pricePerHour: 60,
-    imageUrl: "https://images.pexels.com/photos/114296/pexels-photo-114296.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Locker Rooms", "Floodlights", "Parking", "Shower Facilities", "Water Fountains"],
-  },
-  {
-    id: 2,
-    name: "Elite Basketball Court",
-    sportType: "basketball",
-    location: "456 Park Ave, Midtown",
-    description: "Indoor basketball court with professional flooring and scoreboards. The court features regulation dimensions, adjustable hoops, and electronic scoreboards. Perfect for practice, games, or tournaments.",
-    pricePerHour: 45,
-    imageUrl: "https://images.pexels.com/photos/1752757/pexels-photo-1752757.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Locker Rooms", "Air Conditioning", "Seating Area", "Electronic Scoreboard", "Ball Rental"],
-  },
-  {
-    id: 3,
-    name: "Sunshine Tennis Center",
-    sportType: "tennis",
-    location: "789 Oak St, Westside",
-    description: "Outdoor tennis courts with professional surfaces and equipment rental available. Our courts feature professional-grade surfaces, proper net tension, and are regularly maintained for optimal play conditions.",
-    pricePerHour: 35,
-    imageUrl: "https://images.pexels.com/photos/2403303/pexels-photo-2403303.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Equipment Rental", "Coaching Available", "Restrooms", "Pro Shop", "Viewing Area"],
-  },
-  {
-    id: 4,
-    name: "Green Valley Baseball Field",
-    sportType: "baseball",
-    location: "101 Green Valley Rd",
-    description: "Regulation baseball field with dugouts and batting cages. Features a well-maintained infield, outfield, and professional backstop. Ideal for team practices, games, or leagues.",
-    pricePerHour: 70,
-    imageUrl: "https://images.pexels.com/photos/209841/pexels-photo-209841.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Dugouts", "Batting Cages", "Concession Stand", "Bleachers", "Field Lighting"],
-  },
-  {
-    id: 5,
-    name: "City Volleyball Courts",
-    sportType: "volleyball",
-    location: "202 Beach Blvd, Eastside",
-    description: "Indoor and outdoor volleyball courts available for recreational and competitive play. Our facilities include regulation-height nets, proper boundary markings, and well-maintained playing surfaces.",
-    pricePerHour: 40,
-    imageUrl: "https://images.pexels.com/photos/3151954/pexels-photo-3151954.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Indoor & Outdoor Options", "Net Provided", "Changing Rooms", "Referee Stand", "Ball Rental"],
-  },
-  {
-    id: 6,
-    name: "Badminton Center",
-    sportType: "badminton",
-    location: "303 Maple Dr, Northside",
-    description: "Professional badminton courts with proper lighting and flooring. Our courts feature proper line markings, net height, and specialized flooring designed for badminton play.",
-    pricePerHour: 30,
-    imageUrl: "https://images.pexels.com/photos/3660204/pexels-photo-3660204.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    amenities: ["Equipment Rental", "Air Conditioning", "Pro Shop", "Coaching Services", "Spectator Seating"],
-  },
-];
-
-// Mock time slots - would be fetched from your Laravel API
 const timeSlots = ["08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM"];
 
-// Randomly mark some time slots as unavailable
-const getAvailableTimeSlots = () => {
-  return timeSlots.map((slot) => ({
-    time: slot,
-    available: Math.random() > 0.3, // 70% chance of being available
-  }));
-};
+// Fungsi untuk menghitung end_time (1 jam setelah start_time)
+function getEndTime(startTime: string) {
+  const [time, modifier] = startTime.split(" ");
+  let [hours, minutes] = time.split(":").map(Number);
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+  hours += 1;
+  if (hours === 24) hours = 0;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+}
+
+// Fungsi untuk mengubah "10:00 AM" menjadi "10:00:00" (format waktu di database)
+function toDbTimeFormat(slot: string) {
+  const [time, modifier] = slot.split(" ");
+  let [hours, minutes] = time.split(":").map(Number);
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`;
+}
 
 export default function FieldDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const fieldId = Number(params.id);
+  const fieldId = params.id as string;
 
-  const field = mockFields.find((f) => f.id === fieldId);
-
+  const [field, setField] = useState<FieldData | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState(getAvailableTimeSlots());
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Handle date change - in real app, this would fetch availability from API
+  // Fetch field data
+  useEffect(() => {
+    const fetchField = async () => {
+      const { data, error } = await supabase.from("fields").select("*").eq("id", fieldId).single();
+      if (error) {
+        setField(null);
+      } else {
+        setField(data as FieldData);
+      }
+    };
+    fetchField();
+  }, [fieldId]);
+
+  // Fetch user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    getUser();
+  }, []);
+
+  // Fetch bookings & set available time slots setiap kali tanggal berubah
+  useEffect(() => {
+    const fetchBookingsAndSetSlots = async () => {
+      if (!date) {
+        setAvailableTimeSlots(timeSlots.map((slot) => ({ time: slot, available: true })));
+        return;
+      }
+      const { data: bookings } = await supabase.from("bookings").select("start_time").eq("field_id", fieldId).eq("date", format(date, "yyyy-MM-dd")).eq("status", "confirmed");
+
+      const bookedTimes = bookings ? bookings.map((b) => b.start_time) : [];
+      setAvailableTimeSlots(
+        timeSlots.map((slot) => {
+          const dbTime = toDbTimeFormat(slot);
+          return {
+            time: slot,
+            available: !bookedTimes.includes(dbTime),
+          };
+        })
+      );
+    };
+    fetchBookingsAndSetSlots();
+  }, [date, fieldId]);
+
   const handleDateSelect = (newDate: Date | undefined) => {
     setDate(newDate);
     setSelectedTimeSlot(null);
-    setAvailableTimeSlots(getAvailableTimeSlots());
+    // availableTimeSlots akan otomatis di-update oleh useEffect di atas
   };
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!date || !selectedTimeSlot) return;
 
-    // In real app, this would send booking request to API
-    alert(`Booking request submitted for ${field?.name} on ${format(date, "PPP")} at ${selectedTimeSlot}`);
+    if (!user) {
+      router.push("/login?redirect=/fields/" + fieldId);
+      return;
+    }
 
-    // Redirect to login if user isn't authenticated
-    // In real app, check auth status first
-    router.push("/login?redirect=/bookings");
+    setLoading(true);
+    const endTime = getEndTime(selectedTimeSlot);
+    const { error } = await supabase.from("bookings").insert([
+      {
+        field_id: fieldId,
+        user_id: user.id,
+        date: format(date, "yyyy-MM-dd"),
+        start_time: toDbTimeFormat(selectedTimeSlot), // simpan dalam format DB!
+        end_time: endTime,
+        status: "pending",
+        total_price: field?.price_per_hour ?? 0,
+      },
+    ]);
+    setLoading(false);
+
+    if (error) {
+      toast.error("Booking gagal: " + error.message);
+    } else {
+      toast.success(`Booking request submitted for ${field?.name} on ${format(date, "PPP")} at ${selectedTimeSlot}`);
+      setSelectedTimeSlot(null);
+    }
   };
 
   if (!field) {
@@ -136,40 +150,38 @@ export default function FieldDetailPage() {
         <ArrowLeft className="h-4 w-4 mr-1" />
         Back to fields
       </Link>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-lg overflow-hidden">
-            <img src={field.imageUrl} alt={field.name} className="w-full aspect-video object-cover" />
+            <img src={field.image_url} alt={field.name} className="w-full aspect-video object-cover" />
           </div>
-
           <div>
             <h1 className="text-3xl font-bold mb-2">{field.name}</h1>
             <div className="flex items-center text-muted-foreground mb-4">
               <MapPin className="h-4 w-4 mr-1" />
               <span>{field.location}</span>
             </div>
-
             <div className="flex items-center gap-2 mb-6">
-              <Badge>{field.sportType.charAt(0).toUpperCase() + field.sportType.slice(1)}</Badge>
-              <Badge variant="outline">${field.pricePerHour}/hour</Badge>
+              <Badge>{field.sport_type?.charAt(0).toUpperCase() + field.sport_type?.slice(1)}</Badge>
+              <Badge variant="outline">${field.price_per_hour}/hour</Badge>
             </div>
-
             <h2 className="text-xl font-semibold mb-2">Description</h2>
             <p className="text-muted-foreground mb-6">{field.description}</p>
-
-            <h2 className="text-xl font-semibold mb-2">Amenities</h2>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
-              {field.amenities.map((amenity, i) => (
-                <li key={i} className="flex items-center">
-                  <div className="h-2 w-2 rounded-full bg-primary mr-2" />
-                  {amenity}
-                </li>
-              ))}
-            </ul>
+            {field.amenities && (
+              <>
+                <h2 className="text-xl font-semibold mb-2">Amenities</h2>
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
+                  {field.amenities.map((amenity: string, i: number) => (
+                    <li key={i} className="flex items-center">
+                      <div className="h-2 w-2 rounded-full bg-primary mr-2" />
+                      {amenity}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         </div>
-
         <div>
           <Card>
             <CardHeader>
@@ -192,7 +204,6 @@ export default function FieldDetailPage() {
                     </PopoverContent>
                   </Popover>
                 </div>
-
                 {date && (
                   <div className="space-y-2">
                     <div className="font-medium">Time Slot</div>
@@ -216,8 +227,8 @@ export default function FieldDetailPage() {
             </CardContent>
             <Separator />
             <CardFooter className="pt-4">
-              <Button className="w-full" disabled={!date || !selectedTimeSlot} onClick={handleBooking}>
-                Book Now - ${field.pricePerHour}
+              <Button className="w-full" disabled={!date || !selectedTimeSlot || loading} onClick={handleBooking}>
+                {loading ? "Booking..." : `Book Now - $${field.price_per_hour}`}
               </Button>
             </CardFooter>
           </Card>
